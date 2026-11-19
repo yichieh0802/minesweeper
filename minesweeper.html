@@ -3,19 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>踩地雷</title>
+<title>3D 踩地雷</title>
 <style>
   :root {
     --bg: #eef1f5;
     --panel: #ffffff;
     --text: #1f2933;
     --muted: #6b7785;
-    --cell: #c9d3df;
-    --cell-hover: #b8c4d3;
     --open: #f7f9fb;
     --border: #d6dde6;
     --accent: #3b82f6;
-    --boom: #ef4444;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -23,8 +20,6 @@
       --panel: #1d232a;
       --text: #e6ebf0;
       --muted: #8b97a5;
-      --cell: #3a4552;
-      --cell-hover: #475464;
       --open: #252c34;
       --border: #2e3741;
     }
@@ -62,7 +57,7 @@
     border-radius: 14px;
     padding: 14px;
     box-shadow: 0 6px 24px rgba(0,0,0,.08);
-    max-width: 100%;
+    width: min(760px, 100%);
   }
   .status {
     display: flex; justify-content: space-between; align-items: center;
@@ -79,128 +74,236 @@
     border-radius: 10px; border: 1px solid var(--border);
     background: var(--open); cursor: pointer;
   }
-  .board-wrap { overflow: auto; max-width: calc(100vw - 64px); }
-  .board { display: grid; gap: 2px; }
-  .cell {
-    width: 30px; height: 30px;
-    background: var(--cell);
-    border-radius: 4px;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 16px;
-    cursor: pointer;
-    transition: background .1s;
+  #stage {
+    position: relative;
+    width: 100%;
+    height: min(560px, 70vh);
+    border-radius: 10px;
+    background: var(--open);
+    overflow: hidden;
+    touch-action: none;
   }
-  .cell:hover:not(.open) { background: var(--cell-hover); }
-  .cell.open { background: var(--open); cursor: default; }
-  .cell.boom { background: var(--boom); }
-  .cell.wrong { background: #fbbf24; }
-  .n1 { color: #2563eb; } .n2 { color: #16a34a; } .n3 { color: #dc2626; }
-  .n4 { color: #7c3aed; } .n5 { color: #b45309; } .n6 { color: #0891b2; }
-  .n7 { color: #374151; } .n8 { color: #9ca3af; }
-  @media (prefers-color-scheme: dark) {
-    .n1 { color: #60a5fa; } .n2 { color: #4ade80; } .n3 { color: #f87171; }
-    .n4 { color: #c084fc; } .n7 { color: #e5e7eb; }
+  #stage canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  #stage canvas:active { cursor: grabbing; }
+  .tools {
+    display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+    margin-top: 12px; font-size: 14px;
+  }
+  .tools label { display: flex; align-items: center; gap: 6px; }
+  .tools select, .tools input[type=range] { accent-color: var(--accent); }
+  .tools select {
+    padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text);
   }
   .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 10px; flex-wrap: wrap; }
-  #flagMode {
+  .tools button, #flagMode {
     border: 1px solid var(--border); background: var(--open); color: var(--text);
     padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 14px;
   }
   #flagMode.on { background: #f59e0b; color: #fff; border-color: #f59e0b; }
   .hint { color: var(--muted); font-size: 13px; }
-  #msg { height: 24px; margin-top: 14px; font-size: 18px; font-weight: bold; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+  #msg { min-height: 24px; margin-top: 14px; font-size: 18px; font-weight: bold; text-align: center; }
   .custom { display: none; gap: 6px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; justify-content: center; }
   .custom.show { display: flex; }
-  .custom input { width: 64px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+  .custom input { width: 56px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+  #fallback { display: none; padding: 40px 16px; text-align: center; color: var(--muted); }
 </style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
 </head>
 <body>
-  <h1>💣 踩地雷</h1>
+  <h1>💣 3D 踩地雷</h1>
 
   <div class="controls">
-    <button data-level="easy" class="active">初級 9×9</button>
-    <button data-level="medium">中級 16×16</button>
-    <button data-level="hard">高級 30×16</button>
+    <button data-level="easy" class="active">初級 4×4×4</button>
+    <button data-level="medium">中級 6×6×6</button>
+    <button data-level="hard">高級 8×8×8</button>
     <button data-level="custom">自訂</button>
   </div>
 
   <div class="custom" id="customBox">
-    寬 <input id="cw" type="number" min="5" max="40" value="20">
-    高 <input id="ch" type="number" min="5" max="30" value="12">
-    地雷 <input id="cm" type="number" min="1" value="40">
+    寬 <input id="cw" type="number" min="4" max="10" value="7">
+    高 <input id="ch" type="number" min="4" max="10" value="5">
+    深 <input id="cd" type="number" min="4" max="10" value="7">
+    地雷 <input id="cm" type="number" min="1" value="30">
     <button id="customGo" style="padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer">開始</button>
   </div>
 
   <div class="game">
     <div class="status">
-      <div class="counter" id="mines">010</div>
+      <div class="counter" id="mines">006</div>
       <button id="face" title="重新開始">🙂</button>
       <div class="counter" id="timer">000</div>
     </div>
-    <div class="board-wrap"><div class="board" id="board"></div></div>
+    <div id="stage"><div id="fallback">此瀏覽器不支援 WebGL，無法顯示 3D 棋盤。</div></div>
+
+    <div class="tools">
+      <label>剖面
+        <select id="sliceAxis">
+          <option value="">全部</option>
+          <option value="x">X 軸</option>
+          <option value="y">Y 軸</option>
+          <option value="z">Z 軸</option>
+        </select>
+      </label>
+      <label>層 <input id="sliceLayer" type="range" min="0" max="3" value="0" disabled> <span id="sliceLabel">–</span></label>
+      <label>間距 <input id="gap" type="range" min="0.05" max="1.5" step="0.05" value="0.35"></label>
+      <button id="resetView">重設視角</button>
+    </div>
+
     <div class="footer">
       <button id="flagMode">🚩 插旗模式：關</button>
-      <span class="hint">左鍵翻開・右鍵插旗・點數字快速翻開</span>
+      <span class="hint">拖曳旋轉・滾輪縮放・左鍵翻開・右鍵插旗・點數字快速翻開</span>
+    </div>
+    <div class="legend">
+      <span><i style="background:#7c9cc9"></i>未翻開</span>
+      <span><i style="background:#f97316"></i>旗子</span>
+      <span><i style="background:#ef4444"></i>引爆</span>
+      <span><i style="background:#334155"></i>地雷</span>
+      <span><i style="background:#a855f7"></i>插錯旗</span>
+      <span>數字＝周圍 26 格中的地雷數</span>
     </div>
   </div>
   <div id="msg"></div>
 
-<script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
 const LEVELS = {
-  easy:   { w: 9,  h: 9,  m: 10 },
-  medium: { w: 16, h: 16, m: 40 },
-  hard:   { w: 30, h: 16, m: 99 },
+  easy:   { w: 4, h: 4, d: 4, m: 6 },
+  medium: { w: 6, h: 6, d: 6, m: 25 },
+  hard:   { w: 8, h: 8, d: 8, m: 60 },
 };
 
-let W, H, M, cells, firstClick, over, flags, opened, timer, seconds, flagMode = false;
-const boardEl = document.getElementById('board');
+const COLORS = {
+  hidden: new THREE.Color('#7c9cc9'),
+  hover:  new THREE.Color('#a9c4ea'),
+  flag:   new THREE.Color('#f97316'),
+  mine:   new THREE.Color('#334155'),
+  boom:   new THREE.Color('#ef4444'),
+  wrong:  new THREE.Color('#a855f7'),
+};
+const NUM_COLORS = ['#2563eb', '#16a34a', '#dc2626', '#7c3aed', '#b45309', '#0891b2', '#374151', '#6b7280'];
+
+let W, H, D, N, M, cells, firstClick, over, flags, opened, timer, seconds, flagMode = false;
+let boomIndex = -1, hovered = -1;
+let current = LEVELS.easy;
+
+const stage = document.getElementById('stage');
 const minesEl = document.getElementById('mines');
 const timerEl = document.getElementById('timer');
 const faceEl = document.getElementById('face');
 const msgEl = document.getElementById('msg');
 const flagBtn = document.getElementById('flagMode');
-let current = LEVELS.easy;
+const sliceAxisEl = document.getElementById('sliceAxis');
+const sliceLayerEl = document.getElementById('sliceLayer');
+const sliceLabelEl = document.getElementById('sliceLabel');
+const gapEl = document.getElementById('gap');
 
 const pad = n => (n < 0 ? '-' + String(-n).padStart(2, '0') : String(n).padStart(3, '0'));
 
+// ---------- Three.js 場景 ----------
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+} catch (e) {
+  document.getElementById('fallback').style.display = 'block';
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(5, 10, 7);
+scene.add(sun);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.enablePan = false;
+controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: null };
+
+const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+const boxMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55, metalness: 0.05 });
+let mesh = null;
+const spriteGroup = new THREE.Group();
+scene.add(spriteGroup);
+
+// 數字貼圖快取
+const texCache = new Map();
+function labelTexture(text, color) {
+  const key = text + color;
+  if (texCache.has(key)) return texCache.get(key);
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(255,255,255,0.9)';
+  g.beginPath(); g.arc(64, 64, 54, 0, Math.PI * 2); g.fill();
+  g.fillStyle = color;
+  g.font = 'bold 72px "Segoe UI", system-ui, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 64, 68);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  texCache.set(key, t);
+  return t;
+}
+const numColor = n => n <= 8 ? NUM_COLORS[n - 1] : `hsl(${(n * 47) % 360} 70% 38%)`;
+
+// ---------- 遊戲邏輯 ----------
+const coord = i => [i % W, Math.floor(i / W) % H, Math.floor(i / (W * H))];
+
 function neighbors(i) {
-  const x = i % W, y = Math.floor(i / W), res = [];
-  for (let dy = -1; dy <= 1; dy++)
-    for (let dx = -1; dx <= 1; dx++) {
-      if (!dx && !dy) continue;
-      const nx = x + dx, ny = y + dy;
-      if (nx >= 0 && nx < W && ny >= 0 && ny < H) res.push(ny * W + nx);
-    }
+  const [x, y, z] = coord(i), res = [];
+  for (let dz = -1; dz <= 1; dz++)
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy && !dz) continue;
+        const nx = x + dx, ny = y + dy, nz = z + dz;
+        if (nx >= 0 && nx < W && ny >= 0 && ny < H && nz >= 0 && nz < D) res.push((nz * H + ny) * W + nx);
+      }
   return res;
 }
 
 function newGame(cfg = current) {
   current = cfg;
-  W = cfg.w; H = cfg.h; M = Math.min(cfg.m, W * H - 9);
-  cells = Array.from({ length: W * H }, () => ({ mine: false, open: false, flag: false, n: 0 }));
-  firstClick = true; over = false; flags = 0; opened = 0; seconds = 0;
+  W = cfg.w; H = cfg.h; D = cfg.d; N = W * H * D;
+  M = Math.max(1, Math.min(cfg.m, N - 27));
+  cells = Array.from({ length: N }, () => ({ mine: false, open: false, flag: false, n: 0, sprite: null }));
+  firstClick = true; over = false; flags = 0; opened = 0; seconds = 0; boomIndex = -1; hovered = -1;
   clearInterval(timer); timer = null;
   faceEl.textContent = '🙂'; msgEl.textContent = '';
   timerEl.textContent = pad(0);
   updateMines();
 
-  const size = W > 20 ? 26 : 30;
-  boardEl.style.gridTemplateColumns = `repeat(${W}, ${size}px)`;
-  boardEl.innerHTML = '';
-  cells.forEach((c, i) => {
-    const d = document.createElement('div');
-    d.className = 'cell';
-    d.style.width = d.style.height = size + 'px';
-    d.dataset.i = i;
-    c.el = d;
-    boardEl.appendChild(d);
-  });
+  if (mesh) { scene.remove(mesh); mesh.dispose(); }
+  spriteGroup.children.forEach(s => s.material.dispose());
+  spriteGroup.clear();
+  mesh = new THREE.InstancedMesh(boxGeo, boxMat, N);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  for (let i = 0; i < N; i++) mesh.setColorAt(i, COLORS.hidden);
+  scene.add(mesh);
+
+  updateSliceRange();
+  refreshAll();
+  resetView();
 }
 
 function placeMines(safe) {
   const forbidden = new Set([safe, ...neighbors(safe)]);
   const pool = [];
-  for (let i = 0; i < W * H; i++) if (!forbidden.has(i)) pool.push(i);
+  for (let i = 0; i < N; i++) if (!forbidden.has(i)) pool.push(i);
   for (let k = 0; k < M; k++) {
     const r = k + Math.floor(Math.random() * (pool.length - k));
     [pool[k], pool[r]] = [pool[r], pool[k]];
@@ -225,12 +328,19 @@ function reveal(i) {
     const c = cells[k];
     if (c.open || c.flag) continue;
     c.open = true; opened++;
-    c.el.classList.add('open');
     if (c.mine) return lose(k);
-    if (c.n) { c.el.textContent = c.n; c.el.classList.add('n' + c.n); }
+    if (c.n) addNumber(k);
     else neighbors(k).forEach(j => { if (!cells[j].open) stack.push(j); });
   }
   return true;
+}
+
+function addNumber(i) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(String(cells[i].n), numColor(cells[i].n)) }));
+  s.scale.setScalar(0.75);
+  s.userData.i = i;
+  cells[i].sprite = s;
+  spriteGroup.add(s);
 }
 
 function openCell(i) {
@@ -243,11 +353,12 @@ function openCell(i) {
     if (!c.n) return;
     const nb = neighbors(i);
     if (nb.filter(j => cells[j].flag).length !== c.n) return;
-    for (const j of nb) if (!cells[j].open && !cells[j].flag) { if (reveal(j) === false) return; }
+    for (const j of nb) if (!cells[j].open && !cells[j].flag) { if (reveal(j) === false) break; }
   } else {
-    if (reveal(i) === false) return;
+    reveal(i);
   }
   checkWin();
+  refreshAll();
 }
 
 function toggleFlag(i) {
@@ -256,64 +367,191 @@ function toggleFlag(i) {
   if (c.open) return;
   c.flag = !c.flag;
   flags += c.flag ? 1 : -1;
-  c.el.textContent = c.flag ? '🚩' : '';
   updateMines();
+  refreshAll();
 }
 
 function lose(k) {
   over = true; clearInterval(timer);
+  boomIndex = k;
   faceEl.textContent = '😵';
   msgEl.textContent = '💥 踩到地雷了！點擊表情重新開始';
-  cells.forEach((c, i) => {
-    if (c.mine && !c.flag) { c.el.textContent = '💣'; c.el.classList.add('open'); }
-    if (!c.mine && c.flag) { c.el.textContent = '❌'; c.el.classList.add('wrong'); }
-  });
-  cells[k].el.classList.add('boom');
   return false;
 }
 
 function checkWin() {
-  if (over || opened !== W * H - M) return;
+  if (over || opened !== N - M) return;
   over = true; clearInterval(timer);
   faceEl.textContent = '😎';
-  cells.forEach(c => { if (c.mine && !c.flag) { c.flag = true; c.el.textContent = '🚩'; } });
+  cells.forEach(c => { if (c.mine) c.flag = true; });
   flags = M; updateMines();
   msgEl.textContent = `🎉 恭喜過關！用時 ${seconds} 秒`;
 }
 
-// 滑鼠事件
-boardEl.addEventListener('click', e => {
-  const i = e.target.dataset.i; if (i === undefined) return;
-  const c = cells[+i];
-  if (flagMode && !c.open) toggleFlag(+i); else openCell(+i);
-});
-boardEl.addEventListener('contextmenu', e => {
-  e.preventDefault();
-  const i = e.target.dataset.i; if (i === undefined) return;
-  toggleFlag(+i);
-});
-boardEl.addEventListener('mousedown', e => { if (!over && e.button === 0) faceEl.textContent = '😮'; });
-document.addEventListener('mouseup', () => { if (!over) faceEl.textContent = '🙂'; });
+// ---------- 繪製 ----------
+const tmpMat = new THREE.Matrix4();
+const tmpPos = new THREE.Vector3();
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 
-// 手機長按插旗
-let pressTimer = null, longPressed = false;
-boardEl.addEventListener('touchstart', e => {
-  const i = e.target.dataset.i; if (i === undefined) return;
+function pitch() { return 1 + parseFloat(gapEl.value); }
+
+function inSlice(i) {
+  const axis = sliceAxisEl.value;
+  if (!axis) return true;
+  const [x, y, z] = coord(i);
+  const v = { x, y, z }[axis];
+  return v === +sliceLayerEl.value;
+}
+
+function cellPos(i, out) {
+  const [x, y, z] = coord(i), p = pitch();
+  return out.set((x - (W - 1) / 2) * p, (y - (H - 1) / 2) * p, (z - (D - 1) / 2) * p);
+}
+
+function cellColor(i) {
+  const c = cells[i];
+  if (i === boomIndex) return COLORS.boom;
+  if (over && boomIndex >= 0) {
+    if (c.mine && !c.flag) return COLORS.mine;
+    if (!c.mine && c.flag) return COLORS.wrong;
+  }
+  if (c.flag) return COLORS.flag;
+  if (i === hovered) return COLORS.hover;
+  return COLORS.hidden;
+}
+
+function refreshCell(i) {
+  const c = cells[i], show = inSlice(i);
+  const boxVisible = show && (!c.open || i === boomIndex || (over && c.mine));
+  if (boxVisible) {
+    cellPos(i, tmpPos);
+    tmpMat.makeTranslation(tmpPos.x, tmpPos.y, tmpPos.z);
+    mesh.setMatrixAt(i, tmpMat);
+  } else {
+    mesh.setMatrixAt(i, ZERO);
+  }
+  mesh.setColorAt(i, cellColor(i));
+  if (c.sprite) {
+    c.sprite.visible = show;
+    cellPos(i, c.sprite.position);
+  }
+}
+
+function refreshAll() {
+  for (let i = 0; i < N; i++) refreshCell(i);
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.instanceColor.needsUpdate = true;
+  mesh.computeBoundingSphere();
+}
+
+function updateSliceRange() {
+  const axis = sliceAxisEl.value;
+  sliceLayerEl.disabled = !axis;
+  if (!axis) { sliceLabelEl.textContent = '–'; return; }
+  const max = { x: W, y: H, z: D }[axis] - 1;
+  sliceLayerEl.max = max;
+  if (+sliceLayerEl.value > max) sliceLayerEl.value = max;
+  sliceLabelEl.textContent = `${+sliceLayerEl.value + 1}/${max + 1}`;
+}
+
+function resetView() {
+  const p = pitch();
+  const size = Math.max(W, H, D) * p;
+  camera.position.set(size * 1.25, size * 1.0, size * 1.6);
+  controls.target.set(0, 0, 0);
+  controls.minDistance = size * 0.5;
+  controls.maxDistance = size * 5;
+  controls.update();
+}
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+renderer.setAnimationLoop(() => {
+  controls.update();
+  renderer.render(scene, camera);
+});
+
+// ---------- 點選（區分拖曳與點擊） ----------
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+
+function pick(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const targets = [mesh, ...spriteGroup.children.filter(s => s.visible)];
+  const hit = raycaster.intersectObjects(targets, false)[0];
+  if (!hit) return -1;
+  return hit.object === mesh ? hit.instanceId : hit.object.userData.i;
+}
+
+function setHover(i) {
+  if (i === hovered) return;
+  const prev = hovered;
+  hovered = i;
+  if (prev >= 0 && prev < N) mesh.setColorAt(prev, cellColor(prev));
+  if (i >= 0) mesh.setColorAt(i, cellColor(i));
+  mesh.instanceColor.needsUpdate = true;
+}
+
+let down = null, pressTimer = null, longPressed = false;
+const canvas = renderer.domElement;
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('pointerdown', e => {
+  down = { x: e.clientX, y: e.clientY, button: e.button };
   longPressed = false;
-  pressTimer = setTimeout(() => { longPressed = true; toggleFlag(+i); if (navigator.vibrate) navigator.vibrate(30); }, 400);
-}, { passive: true });
-boardEl.addEventListener('touchend', e => {
-  clearTimeout(pressTimer);
-  if (longPressed) e.preventDefault();
+  if (!over && e.button === 0) faceEl.textContent = '😮';
+  if (e.pointerType === 'touch') {
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(() => {
+      const i = pick(e);
+      if (i >= 0) { longPressed = true; toggleFlag(i); if (navigator.vibrate) navigator.vibrate(30); }
+    }, 450);
+  }
 });
-boardEl.addEventListener('touchmove', () => clearTimeout(pressTimer), { passive: true });
+canvas.addEventListener('pointermove', e => {
+  if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) {
+    down.moved = true;
+    clearTimeout(pressTimer);
+  }
+  if (e.pointerType === 'mouse' && !down) {
+    const i = pick(e);
+    setHover(i >= 0 && !cells[i].open && !over ? i : -1);
+  }
+});
+canvas.addEventListener('pointerleave', () => setHover(-1));
+window.addEventListener('pointerup', e => {
+  clearTimeout(pressTimer);
+  if (!over) faceEl.textContent = '🙂';
+  const d = down; down = null;
+  if (!d || d.moved || longPressed || e.target !== canvas) return;
+  const i = pick(e);
+  if (i < 0) return;
+  if (d.button === 2) toggleFlag(i);
+  else if (d.button === 0) {
+    if (flagMode && !cells[i].open) toggleFlag(i); else openCell(i);
+  }
+});
 
+// ---------- 介面 ----------
 faceEl.addEventListener('click', () => newGame());
 flagBtn.addEventListener('click', () => {
   flagMode = !flagMode;
   flagBtn.classList.toggle('on', flagMode);
   flagBtn.textContent = `🚩 插旗模式：${flagMode ? '開' : '關'}`;
 });
+sliceAxisEl.addEventListener('change', () => { updateSliceRange(); refreshAll(); });
+sliceLayerEl.addEventListener('input', () => { updateSliceRange(); refreshAll(); });
+gapEl.addEventListener('input', refreshAll);
+document.getElementById('resetView').addEventListener('click', resetView);
 
 document.querySelectorAll('.controls button').forEach(b => {
   b.addEventListener('click', () => {
@@ -326,10 +564,11 @@ document.querySelectorAll('.controls button').forEach(b => {
 });
 document.getElementById('customGo').addEventListener('click', () => {
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v | 0));
-  const w = clamp(document.getElementById('cw').value, 5, 40);
-  const h = clamp(document.getElementById('ch').value, 5, 30);
-  const m = clamp(document.getElementById('cm').value, 1, w * h - 9);
-  newGame({ w, h, m });
+  const w = clamp(document.getElementById('cw').value, 4, 10);
+  const h = clamp(document.getElementById('ch').value, 4, 10);
+  const d = clamp(document.getElementById('cd').value, 4, 10);
+  const m = clamp(document.getElementById('cm').value, 1, w * h * d - 27);
+  newGame({ w, h, d, m });
 });
 
 newGame();
